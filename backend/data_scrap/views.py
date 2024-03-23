@@ -13,6 +13,7 @@ def fetchRealTimeData():
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     driver.get("https://www.google.com/")
+
     driver.get('https://mausam.imd.gov.in/imd_latest/contents/satellite.php')
 
     time.sleep(5)
@@ -24,6 +25,18 @@ def fetchRealTimeData():
         urllib.request.urlretrieve(src, 'static/real-time-scrap/processing.png')
     except Exception as e:
         print("Done")
+
+    driver.get("https://tropic.ssec.wisc.edu/real-time/imagemain.php?&basin=indian&prod=irbbm&sat=m5")
+
+    time.sleep(5)
+
+    image_element = driver.find_element(By.XPATH, '/html/body/table/tbody/tr/td/center/p/img')
+    src = image_element.get_attribute('src')
+    try:
+        print("Original Image Success")
+        urllib.request.urlretrieve(src, 'static/real-time-scrap/original.png')
+    except Exception as e:
+        print("Done")    
 
     driver.get("https://tropic.ssec.wisc.edu/real-time/imagemain.php?&basin=indian&prod=irn&sat=m5")
 
@@ -39,4 +52,3 @@ def fetchRealTimeData():
     
     driver.quit()
     print("Sleeping")
-    time.sleep(30)

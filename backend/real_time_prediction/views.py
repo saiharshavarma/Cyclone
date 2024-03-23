@@ -76,18 +76,17 @@ def getOtherMetrics(wind_speed):
 
 def predictRealTime():
     global loaded_model
-    #fetchRealTimeData()
+    fetchRealTimeData()
 
     new_image_path = 'static/real-time-scrap/processing.png'
-    original_image_path = 'static/real-time-scrap/processing.png'
+    original_image_path = 'static/real-time-scrap/original.png'
     ir_image_path = 'static/real-time-scrap/ir.png'
-    original_image = cv2.imread(original_image_path)
-    original_image = original_image[500:1280, 200:1060]
-    #original_image = original_image.crop((480, 0, 980, 500))
+    original_image = Image.open(original_image_path)
+    original_image = original_image.crop((480, 0, 980, 500))
     ir_image = Image.open(ir_image_path)
     ir_image = ir_image.crop((480, 0, 980, 500))
 
-    print("Original image shape:", original_image.shape)
+    print("Original image shape:", original_image.size)
     print("IR image shape:", ir_image.size)
 
     processed_image = load_and_preprocess_single_image(new_image_path)
@@ -97,9 +96,9 @@ def predictRealTime():
         prediction = loaded_model.predict(processed_image)
         print(f'Predicted WMO_WIND: {prediction[0][0]}')
 
+        original_image_rgba = original_image.convert("RGBA")
         original_buffer = io.BytesIO()
-        original_pil_image = Image.fromarray(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
-        original_pil_image.save(original_buffer, format='PNG')
+        original_image_rgba.save(original_buffer, format='PNG')
         original_buffer.seek(0)
 
         original_img = ContentFile(original_buffer.read(), name='original.png')

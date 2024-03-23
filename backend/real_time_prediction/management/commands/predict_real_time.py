@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Schedule the task every 30 seconds
-        schedule.every(30).seconds.do(predictRealTime)
+        schedule.every(30).minutes.do(predictRealTime)
 
         # Keep the process running to execute scheduled tasks
         while True:
