@@ -14,8 +14,9 @@ import io
 import cv2
 from PIL import Image
 import random
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
-# Load the model when the module is imported
 loaded_model = tf.keras.models.load_model('model.h5')
 
 def image_crop(image, filename):
@@ -48,14 +49,13 @@ def load_and_preprocess_single_image(image_path):
         cropped_image_pil = image_crop(image_pil, image_path)
         cropped_image_array = np.array(cropped_image_pil)
 
-        # Perform level sets segmentation
         segmented_image = image_segmentation_level_sets(cropped_image_array)
 
         image = tf.convert_to_tensor(segmented_image)
 
         image = tf.image.resize(image, (256, 256))
         image = image / 255.0
-        return cropped_image_array, segmented_image, image
+        return image
     except Exception as err:
         print(err)
         return None
@@ -75,39 +75,44 @@ def getOtherMetrics(wind_speed):
         return 921, 7, 5   
 
 def predictRealTime():
-    global loaded_model  # Access the globally loaded model
+    global loaded_model
     #fetchRealTimeData()
 
-    new_image_path = 'static/real-time-scrap/real-time.png'
+    new_image_path = 'static/real-time-scrap/processing.png'
+    original_image_path = 'static/real-time-scrap/processing.png'
+    ir_image_path = 'static/real-time-scrap/ir.png'
+    original_image = cv2.imread(original_image_path)
+    original_image = original_image[500:1280, 200:1060]
+    #original_image = original_image.crop((480, 0, 980, 500))
+    ir_image = Image.open(ir_image_path)
+    ir_image = ir_image.crop((480, 0, 980, 500))
 
-    original_image, segmented_image, processed_image = load_and_preprocess_single_image(new_image_path)
+    print("Original image shape:", original_image.shape)
+    print("IR image shape:", ir_image.size)
+
+    processed_image = load_and_preprocess_single_image(new_image_path)
 
     if processed_image is not None:
         processed_image = np.expand_dims(processed_image, axis=0)
         prediction = loaded_model.predict(processed_image)
         print(f'Predicted WMO_WIND: {prediction[0][0]}')
 
-        # Save original image to in-memory file buffer
         original_buffer = io.BytesIO()
         original_pil_image = Image.fromarray(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
         original_pil_image.save(original_buffer, format='PNG')
         original_buffer.seek(0)
 
-        # Create Django ImageField instance for the original image
         original_img = ContentFile(original_buffer.read(), name='original.png')
 
-        # Convert NumPy arrays to PIL images and save processed image
-        processed_pil_image = Image.fromarray((segmented_image).astype(np.uint8))
-        processed_buffer = io.BytesIO()
-        processed_pil_image.save(processed_buffer, format='PNG')
-        processed_buffer.seek(0)
+        ir_image_rgba = ir_image.convert("RGBA")
+        ir_buffer = io.BytesIO()
+        ir_image_rgba.save(ir_buffer, format='PNG')
+        ir_buffer.seek(0)
 
-        # Create Django ImageField instance for the processed image
-        processed_img = ContentFile(processed_buffer.read(), name='processed.png')
+        processed_img = ContentFile(ir_buffer.read(), name='processed.png')
 
         pressure, t_number, category = getOtherMetrics(float(prediction[0][0]))
 
-        # Create and save RealTimePrediction object
         cyclone_intensity = RealTimePrediction.objects.create(
             wind=float(prediction[0][0]), 
             pressure=pressure+random.randint(0,5),
@@ -117,6 +122,12 @@ def predictRealTime():
             processed_img=processed_img,
         )
         cyclone_intensity.save()
+        
+        # Send real-time update to WebSocket clients
+        # channel_layer = get_channel_layer()
+        # async_to_sync(channel_layer.group_send)(
+        #     "predictions", {"type": "send_prediction_update", "data": RealTimePredictionSerializer(cyclone_intensity).data}
+        # )
     else:
         print("Image loading or preprocessing failed.")
     return HttpResponse("Done")
